@@ -15,6 +15,7 @@ class StorageLocation:
             if self.debug:
                 print("File not found, creating file...")
         self.data = self.getImmutableData()
+        self.datalength = len(self.data)
         self.length = len(self)
         self.inRange = lambda: range(0, len(self.data), self.keylength + self.valuelength)
 
@@ -34,10 +35,12 @@ class StorageLocation:
 
     # sets the entire file contents equal to (b)
     def write(self, b):
+        b = bytes(b)
         with open(self.path, "wb") as f:
             if self.debug:
                 print(f"Writing: {b}")
             f.write(b)
+            self.datalength = len(b)
             self.data = b
     
     def getImmutableData(self): return self.getData(immutable=True)
@@ -56,6 +59,7 @@ class StorageLocation:
                 return i // self.keylength + self.valuelength
         return None
 
+    # indexing a file in dict form instead of list form will set the value of the nth key
     def __setitem__(self, key, val):
         if len(val) != self.valuelength:
             print("value in setitem is not of length self.valuelength")
@@ -68,12 +72,18 @@ class StorageLocation:
             val = bytes(val, 'utf-8')
         if t is int:
             i = key * (self.keylength + self.valuelength)
-            if i in len(self.data):
-                print(f"index out of bounds {key}")
-                raise IndexError
             if self.debug:
                 print(f"Writing {val} at {i}")
-            for j in range(self.keylength):
+            if not i in range(len(self)):
+                print(i)
+                print(f"index {i} > {self.datalength} out of bounds {key}")
+                raise IndexError
+            if not self.isList:
+                n = self.valuelength
+                i += self.keylength
+            else:
+                n = self.keylength
+            for j in range(n):
                 b[i+j] = val[j]
         elif t in [bytearray, bytes, str]:
             if t is str:
@@ -87,8 +97,9 @@ class StorageLocation:
 Used getitem to call self.index when self.isList True.  Illadvised.
 key should be of type int for list style storage""")
                 raise TypeError
+            if self.debug:
+                print(f"Writing: {val} at {i}")
             for j in range(self.valuelength):
-                print(i, j, val, type(i), type(j))
                 b[i+j] = val[j]
         self.write(b)
         return self.data         
@@ -114,7 +125,7 @@ key should be of type int for list style storage""")
         raise TypeError         
 
     def __len__(self):
-        return len(self.data)
+        return self.datalength
 
     def __str__(self):
         return str(self.getImmutableData())
