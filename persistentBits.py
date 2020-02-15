@@ -4,7 +4,7 @@ class StorageLocation:
     # if valuelength is not provided, storage will automatically be in list form.
     def __init__(self, keylength, valuelength=None, path="./bits.b", debug=False, List=False):
         self.keylength = keylength
-        if valuelength is None or List:
+        if valuelength is None or List or valuelength == 0:
             valuelength = 0
             List = True
         self.valuelength = valuelength
@@ -49,14 +49,16 @@ class StorageLocation:
     def index(self, e, searchForKey=True): # search for key or value
         t = type(e)
         if not (t == bytes or t == bytearray):
-            print(f"{e} parameter (e) must be of type bytes or bytearray")
+            print(f"{e} parameter (e) must be of type bytes or bytearray.  Is type {type(e)}\n")
             raise TypeError
-        d = 0
-        if not searchForKey:
-            d = self.valuelength
+        d = lambda : 0
+        if searchForKey:
+            d = lambda : self.data[i : i + self.keylength]        
+        else:
+            d = lambda : self.data[i + self.keylength : i + self.keylength + self.valuelength]
         for i in self.inRange():
-            if self.data[i + d : i + d + self.keylength] == e:
-                return i // self.keylength + self.valuelength
+            if d() == e:
+                return i // self.keylength + self.valuelength - 1
         return None
 
     # indexing a file in dict form instead of list form will set the value of the nth key
@@ -94,15 +96,15 @@ class StorageLocation:
                 raise KeyError
             if self.isList:
                 print("""
-Used getitem to call self.index when self.isList True.  Illadvised.
-key should be of type int for list style storage""")
+Index must be of type int when self.isList is True.
+""")
                 raise TypeError
             if self.debug:
                 print(f"Writing: {val} at {i}")
             for j in range(self.valuelength):
                 b[i+j] = val[j]
         self.write(b)
-        return self.data         
+        return self.data    
 
     def __getitem__(self, key):
         t = type(key)
@@ -112,16 +114,20 @@ key should be of type int for list style storage""")
         elif t in [bytearray, bytes, str]:
             if t is str:
                 key = bytes(key, 'utf-8')
-            i = self.index(key) - self.valuelength
+            if len(key) != self.keylength:
+                print(key, "not a valid key length.")
+                raise KeyError
+            index = self.index(key) * (self.keylength + self.valuelength) 
+            if index is None and self.isList:
+                print("""
+Index must be of type int when self.isList is True.
+""")
+                raise TypeError
+            i = index + self.keylength
             if i < 0:
                 print(f"Item with key {key} not found.")
                 raise KeyError
-            if self.isList:
-                print("""
-Used getitem to call self.index when self.isList True.  Illadvised.
-key should be of type int for list style storage""")
-                raise TypeError
-            return self.data[i+self.keylength:i+self.keylength+self.valuelength]
+            return self.data[i:i+self.valuelength]
         raise TypeError         
 
     def __len__(self):
